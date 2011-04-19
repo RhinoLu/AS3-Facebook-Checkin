@@ -1,0 +1,385 @@
+package 
+{
+	/**
+	 * ...
+	 * @author gotoAndPlay()™ Digital Consulting.
+	 * @author Rhino Lu
+	 */
+	import com.bit101.components.ComboBox;
+	import com.bit101.components.PushButton;
+	import com.adobe.serialization.json.JSON;
+	import com.facebook.graph.controls.Distractor;
+	import com.facebook.graph.Facebook;
+	import com.google.maps.LatLng;
+	import com.google.maps.Map;
+	import com.google.maps.MapEvent;
+	import com.google.maps.overlays.Marker;
+	import com.google.maps.overlays.MarkerOptions;
+	import flash.display.Sprite;
+	import flash.display.StageAlign;
+	import flash.display.StageQuality;
+	import flash.display.StageScaleMode;
+	import flash.events.Event;
+	import flash.events.MouseEvent;
+	import flash.geom.Point;
+	import flash.net.LocalConnection;
+	import flash.system.Capabilities;
+	import flash.system.Security;
+	import flash.text.TextField;
+	
+	public class Main extends Sprite 
+	{
+		private const APP_ID:String = "212187482143493";
+		private var default_lat:Number = 25.014932;
+		private var default_lng:Number = 121.534498;
+		private var clear_btn:PushButton;
+		private var connect_btn:PushButton;
+		private var checkin_btn:PushButton;
+		private var getPlace_btn:PushButton;
+		//private var place_cb:ComboBox;
+		private var fb_loading:Distractor;
+		private var info_txt:TextField;
+		private var map:Map;
+		private var _lat:Number;
+		private var _lng:Number;
+		
+		public function Main():void 
+		{
+			if (stage) init();
+			else addEventListener(Event.ADDED_TO_STAGE, init);
+		}
+		
+		private function init(e:Event = null):void 
+		{
+			removeEventListener(Event.ADDED_TO_STAGE, init);
+			stage.align = StageAlign.TOP_LEFT;
+			stage.quality = StageQuality.HIGH;
+			stage.scaleMode = StageScaleMode.NO_SCALE;
+			
+			initMap();
+			
+			info_txt = new TextField();
+			//info_txt.mouseEnabled = false;
+			info_txt.multiline = true;
+			info_txt.width = stage.stageWidth;
+			info_txt.height = 100;
+			info_txt.background = true;
+			addChild(info_txt);
+			
+			clear_btn    = new PushButton(this, stage.stageWidth - 110,  10, "Clear"    , clearInfo);
+			getPlace_btn = new PushButton(this, stage.stageWidth - 110, 110, "Get Place", getPlace);
+			
+			//place_cb     = new ComboBox(  this, stage.stageWidth - 110, 130);
+			checkin_btn  = new PushButton(this, stage.stageWidth - 110, 140, "Check in" , checkin);
+			checkin_btn.mouseEnabled = false;
+			
+			if (!((new LocalConnection().domain == "localhost") || Capabilities.playerType == "Desktop")) {
+				info_txt.appendText("Facebook.init\n");
+				Facebook.init(APP_ID, onInit);
+			}
+			addFBLoading();
+			
+			
+		}
+		
+		private function onInit(result:Object, fail:Object):void
+		{
+			info_txt.appendText("onInit\n");
+			if (result) {
+				info_txt.appendText(t.obj(result));
+				getUserData();
+			} else {
+				removeFBLoading();
+				connect_btn = new PushButton(this, stage.stageWidth * 0.5, stage.stageHeight * 0.5, "Connect", popup);
+			}
+		}
+		
+		private function clearInfo(e:MouseEvent):void 
+		{
+			info_txt.text = "";
+		}
+		
+		private function popup(e:MouseEvent):void 
+		{
+			connect_btn.mouseEnabled = false;
+			
+			//var opts:Object = { perms:"email" };
+			var opts:Object = { perms:"user_checkins,publish_checkins" };
+			Facebook.login(onLogin,opts);
+			addFBLoading();
+		}
+		
+		private function onLogin(result:Object, fail:Object):void
+		{
+			info_txt.appendText("onLogin\n");
+			if (result) {
+				info_txt.appendText(t.obj(result));
+				removeChild(connect_btn);
+				connect_btn = null;
+				getUserData();
+			} else {
+				removeFBLoading();
+				connect_btn.mouseEnabled = true;
+			}
+		}
+		
+		// Get Data **********************************************************************************************************************************
+		private function getUserData():void
+		{
+			info_txt.appendText("getUserData\n");
+			Facebook.fqlQuery("SELECT uid,name,pic_big FROM user WHERE uid = me() ", onDataComplete);
+			//Facebook.fqlQuery("SELECT coords,tagged_uids,author_uid,page_id,app_id,post_id,timestamp,message FROM checkin WHERE checkin_id = xxxxx ", onDataComplete);
+		}
+		
+		private function onDataComplete(result:Object, fail:Object):void
+		{
+			removeFBLoading();
+			
+			if (result) {
+				trace("========= onDataComplete ==========");
+				//t.obj(result);
+				info_txt.appendText(t.obj(result));
+				trace("=========      end       ==========");
+				//trace(result[0].uid);
+				//trace(result[0].name);
+				//trace(result[0].pic_big);
+				//trace(result[0].email);
+				//trace(result[0].likes);
+				//_txt.text = result[0].uid + "," + result[0].name + "," + result[0].pic_big + "," + result[0].likes;
+				//t.obj(result[0].likes);
+				//fb_session = result[0] as FacebookSession;
+				//t.obj(fb_session);
+				//fb_uid = result[0].uid;
+				//upload_btn = new PushButton(this, 200, 100, "upload", uploadPhoto);
+				
+				getUserCheckins();
+				
+				checkin_btn.mouseEnabled = true;
+			}
+			if (fail) {
+				//t.obj(fail);
+				//_txt.text = "fail";
+			}
+		}
+		
+		// Get Checkin **********************************************************************************************************************************
+		private function getUserCheckins():void
+		{
+			info_txt.appendText("getUserCheckins\n");
+			Facebook.api("me/checkins", onCheckinDataComplete);
+			
+			addFBLoading();
+		}
+		
+		private function onCheckinDataComplete(result:Object, fail:Object):void
+		{
+			info_txt.appendText("onCheckinDataComplete\n");
+			if (result) {
+				trace("===== onCheckinDataComplete =======");
+				//t.obj(result);
+				info_txt.appendText(t.obj(result));
+				trace("=========      end       ==========");
+			}
+			if (fail) {
+				t.obj(fail);
+			}
+			
+			removeFBLoading();
+		}
+		
+		// Checkin **********************************************************************************************************************************
+		private function checkin(e:MouseEvent):void
+		{
+			checkin_btn.mouseEnabled = false;
+			
+			info_txt.appendText("checkin\n");
+			var obj:Object = { };
+			//obj.message = "測試";
+			obj.place = "217291341621335"; // 
+			obj.coordinates = JSON.encode({ "latitude":default_lat, "longitude":default_lng }); // 經緯度
+			//obj.tags = [uid1,uid2]; // 誰也在這裡
+			info_txt.appendText(t.obj(obj));
+			Facebook.api("me/checkins", onCheckinComplete, obj, "POST");
+			
+			addFBLoading();
+		}
+		
+		private function onCheckinComplete(result:Object, fail:Object):void
+		{
+			info_txt.appendText("onCheckinComplete\n");
+			checkin_btn.mouseEnabled = true;
+			if (result) {
+				trace("======= onCheckinComplete =========");
+				//t.obj(result);
+				info_txt.appendText(t.obj(result));
+				trace("=========      end       ==========");
+				getUserCheckins();
+			}
+			if (fail) {
+				//t.obj(fail);
+				info_txt.appendText(t.obj(fail));
+			}
+			
+			removeFBLoading();
+		}
+		
+		// Get Place **********************************************************************************************************************************
+		private function getPlace(e:MouseEvent):void
+		{
+			info_txt.appendText("getPlace\n");
+			var obj:Object = { };
+			//obj.q = "pizza";
+			obj.type = "place";
+			//obj.center = default_lat + "," + default_lng;
+			obj.center = map.getCenter().lat() + "," + map.getCenter().lng();
+			obj.distance = 2000; // 1000 公尺
+			Facebook.api("search", onGetPlaceComplete, obj, "GET");
+			
+			addFBLoading();
+		}
+		
+		private function onGetPlaceComplete(result:Object, fail:Object):void
+		{
+			info_txt.appendText("onGetPlaceComplete\n");
+			if (result) {
+				trace("======= onGetPlaceComplete ========");
+				//t.obj(result);
+				info_txt.appendText(t.obj(result));
+				//putPlaceToComboBox(result as Array);
+				putPlaceToMap(result as Array);
+				trace("=========      end       ==========");
+			}
+			if (fail) {
+				t.obj(fail);
+			}
+			
+			removeFBLoading();
+		}
+		
+		/*private function putPlaceToComboBox(_array:Array):void
+		{
+			place_cb.removeAll();
+			var i:uint;
+			var len:uint = _array.length;
+			var place_obj:Object;
+			for (i = 0; i < len; i++) {
+				place_obj = _array[i];
+				place_obj.label = place_obj.name;
+				place_cb.addItem(place_obj);
+			}
+		}*/
+		
+		private function putPlaceToMap(_array:Array):void
+		{
+			map.clearOverlays();
+			var i:uint;
+			var len:uint = _array.length;
+			var place_obj:Object;
+			var latlng:LatLng;
+			for (i = 0; i < len; i++) {
+				place_obj = _array[i];
+				latlng = new LatLng(place_obj.location.latitude, place_obj.location.longitude);
+				map.addOverlay(createMarker(latlng));
+			}
+		}
+		
+		// Facebook Loading **********************************************************************************************************************************
+		private function addFBLoading():void 
+		{
+			fb_loading = new Distractor();
+			fb_loading.x = stage.stageWidth * 0.5 - 100;
+			fb_loading.y = stage.stageHeight * 0.5;
+			//fb_loading.text = "connecting ...";
+			fb_loading.mouseChildren = fb_loading.mouseEnabled = false;
+			addChild(fb_loading);
+		}
+		
+		private function removeFBLoading():void 
+		{
+			if (fb_loading) {
+				removeChild(fb_loading);
+				fb_loading = null;
+			}
+		}
+		
+		// Google Map **********************************************************************************************************************************
+		private function initMap():void
+		{
+			Security.allowInsecureDomain("maps.googleapis.com");
+			map = new Map();
+			map.key = "ABQIAAAAqMSM8xFmOPGb-4dBPY1IJhRjSOXmjpaW1w5P4B34l-76fx9uexTdhVHfpZZnA8IsDDIIlNuwvSEvYQ"; // gotoandplay
+			
+			//介面語系
+			map.language = "zh-TW";
+			map.setSize(new Point(stage.stageWidth, stage.stageHeight));
+			map.x = 0;
+			map.y = 0;
+			//偵聽MAP載入完成
+			map.addEventListener(MapEvent.MAP_READY, onMapReady);
+			addChild(map);
+		}
+		
+		private function onMapReady(event:MapEvent):void
+		{
+			//trace("onMapReady");
+			
+			//設定MAP中心
+			//map.setCenter(new LatLng(40.736072,-73.992062), 14, MapType.NORMAL_MAP_TYPE);
+			//map.setCenter(new LatLng(25.057538,121.548421), 17); // wwwins
+			map.setCenter(new LatLng(default_lat, default_lng), 16);
+			//map.setCenter(new LatLng(_lat, _lng), 14);
+			
+			//整個台灣
+			//map.setCenter(new LatLng(25.142798,121.549537), 15);
+			//setMapCenter( { "lat":25.142798, "lng":121.549537 }, 15);
+			
+			//增加控制列：上下左右
+			//map.addControl(new PositionControl());  
+			//增加控制列：地圖類型
+			//map.addControl(new MapTypeControl());
+			//增加控制列：放大縮小
+			//var control:IControl = new ZoomControl();
+			//map.addControl(control);
+			//Sprite(control).x = 5;
+			//Sprite(control).y = 5;
+			//使用滾輪縮放地圖
+			//map.enableScrollWheelZoom();
+			//平滑縮放地圖
+			//map.enableContinuousZoom();
+			//取消點擊地圖放大
+			//map.setDoubleClickMode(3);
+				
+			//移除偵聽MAP載入完成
+			map.removeEventListener(MapEvent.MAP_READY, onMapReady);
+			//偵聽MAP VIEW CHANGE START
+			//map.addEventListener(MapMoveEvent.MOVE_START, onMapMoveStart);
+			//偵聽MAP VIEW CHANGE END
+			//map.addEventListener(MapMoveEvent.MOVE_END, onMapMoveEnd);
+			//偵聽MAP ZOOM CHANGE
+			//map.addEventListener(MapZoomEvent.CONTINUOUS_ZOOM_END , onMapZoomEnd);
+			
+			//var latlng:LatLng = new LatLng(25.036004, 121.56722);
+			var latlng:LatLng = new LatLng(map.getCenter().lat(), map.getCenter().lng());
+			map.clearOverlays();
+			map.addOverlay(createMarker(latlng));
+		}
+		
+		private function createMarker(latlng:LatLng):Marker
+		{
+			var options:MarkerOptions = new MarkerOptions();
+			var _mc:MyMarker = new MyMarker();
+			_mc.mouseEnabled = false;
+			_mc.mouseChildren = false;
+			options.icon = _mc;
+			//讓marker不能點
+			options.clickable = false;
+				
+			var marker:Marker = new Marker(latlng , options);
+			//marker.addEventListener(MapMouseEvent.ROLL_OVER, onMakerOver);
+			//marker.addEventListener(MapMouseEvent.ROLL_OUT , onMakerOut);
+			//marker.addEventListener(MapMouseEvent.CLICK    , onMakerClick);
+			return marker;
+		}
+	}
+	
+}
