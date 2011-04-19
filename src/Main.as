@@ -8,11 +8,14 @@ package
 	import com.bit101.components.ComboBox;
 	import com.bit101.components.PushButton;
 	import com.adobe.serialization.json.JSON;
+	import com.bit101.components.Style;
 	import com.facebook.graph.controls.Distractor;
 	import com.facebook.graph.Facebook;
 	import com.google.maps.LatLng;
 	import com.google.maps.Map;
 	import com.google.maps.MapEvent;
+	import com.google.maps.MapMouseEvent;
+	import com.google.maps.MapMoveEvent;
 	import com.google.maps.overlays.Marker;
 	import com.google.maps.overlays.MarkerOptions;
 	import flash.display.Sprite;
@@ -26,6 +29,7 @@ package
 	import flash.system.Capabilities;
 	import flash.system.Security;
 	import flash.text.TextField;
+	import flash.text.TextFieldAutoSize;
 	
 	public class Main extends Sprite 
 	{
@@ -36,7 +40,7 @@ package
 		private var connect_btn:PushButton;
 		private var checkin_btn:PushButton;
 		private var getPlace_btn:PushButton;
-		//private var place_cb:ComboBox;
+		private var place_cb:ComboBox;
 		private var fb_loading:Distractor;
 		private var info_txt:TextField;
 		private var map:Map;
@@ -66,12 +70,15 @@ package
 			info_txt.background = true;
 			addChild(info_txt);
 			
+			Style.fontSize = 12;
+			Style.embedFonts = false;
+			Style.fontName = "Arial";
+			
 			clear_btn    = new PushButton(this, stage.stageWidth - 110,  10, "Clear"    , clearInfo);
 			getPlace_btn = new PushButton(this, stage.stageWidth - 110, 110, "Get Place", getPlace);
-			
-			//place_cb     = new ComboBox(  this, stage.stageWidth - 110, 130);
 			checkin_btn  = new PushButton(this, stage.stageWidth - 110, 140, "Check in" , checkin);
 			checkin_btn.mouseEnabled = false;
+			place_cb     = new ComboBox(  this, stage.stageWidth - 110, 170);
 			
 			if (!((new LocalConnection().domain == "localhost") || Capabilities.playerType == "Desktop")) {
 				info_txt.appendText("Facebook.init\n");
@@ -178,6 +185,9 @@ package
 				trace("===== onCheckinDataComplete =======");
 				//t.obj(result);
 				info_txt.appendText(t.obj(result));
+				
+				
+				putPlaceToComboBox(result as Array);
 				trace("=========      end       ==========");
 			}
 			if (fail) {
@@ -185,6 +195,19 @@ package
 			}
 			
 			removeFBLoading();
+		}
+		
+		private function putPlaceToComboBox(_array:Array):void
+		{
+			place_cb.removeAll();
+			var i:uint;
+			var len:uint = _array.length;
+			var place_obj:Object;
+			for (i = 0; i < len; i++) {
+				place_obj = _array[i];
+				place_obj.label = place_obj.name;
+				place_cb.addItem(place_obj);
+			}
 		}
 		
 		// Checkin **********************************************************************************************************************************
@@ -198,7 +221,7 @@ package
 			obj.place = "217291341621335"; // 
 			obj.coordinates = JSON.encode({ "latitude":default_lat, "longitude":default_lng }); // 經緯度
 			//obj.tags = [uid1,uid2]; // 誰也在這裡
-			info_txt.appendText(t.obj(obj));
+			//info_txt.appendText(t.obj(obj));
 			Facebook.api("me/checkins", onCheckinComplete, obj, "POST");
 			
 			addFBLoading();
@@ -224,7 +247,7 @@ package
 		}
 		
 		// Get Place **********************************************************************************************************************************
-		private function getPlace(e:MouseEvent):void
+		private function getPlace(e:MouseEvent = null):void
 		{
 			info_txt.appendText("getPlace\n");
 			var obj:Object = { };
@@ -245,7 +268,6 @@ package
 				trace("======= onGetPlaceComplete ========");
 				//t.obj(result);
 				info_txt.appendText(t.obj(result));
-				//putPlaceToComboBox(result as Array);
 				putPlaceToMap(result as Array);
 				trace("=========      end       ==========");
 			}
@@ -255,19 +277,6 @@ package
 			
 			removeFBLoading();
 		}
-		
-		/*private function putPlaceToComboBox(_array:Array):void
-		{
-			place_cb.removeAll();
-			var i:uint;
-			var len:uint = _array.length;
-			var place_obj:Object;
-			for (i = 0; i < len; i++) {
-				place_obj = _array[i];
-				place_obj.label = place_obj.name;
-				place_cb.addItem(place_obj);
-			}
-		}*/
 		
 		private function putPlaceToMap(_array:Array):void
 		{
@@ -286,19 +295,25 @@ package
 		// Facebook Loading **********************************************************************************************************************************
 		private function addFBLoading():void 
 		{
-			fb_loading = new Distractor();
-			fb_loading.x = stage.stageWidth * 0.5 - 100;
-			fb_loading.y = stage.stageHeight * 0.5;
-			//fb_loading.text = "connecting ...";
-			fb_loading.mouseChildren = fb_loading.mouseEnabled = false;
-			addChild(fb_loading);
+			if (fb_loading) {
+				fb_loading.visible = true;
+			}else {
+				fb_loading = new Distractor();
+				fb_loading.x = stage.stageWidth * 0.5 - 100;
+				//fb_loading.y = stage.stageHeight * 0.5 - 50;
+				fb_loading.y = 40;
+				//fb_loading.text = "connecting ...";
+				fb_loading.mouseChildren = fb_loading.mouseEnabled = false;
+				addChild(fb_loading);
+			}
 		}
 		
 		private function removeFBLoading():void 
 		{
 			if (fb_loading) {
-				removeChild(fb_loading);
-				fb_loading = null;
+				//removeChild(fb_loading);
+				//fb_loading = null;
+				fb_loading.visible = false;
 			}
 		}
 		
@@ -319,7 +334,7 @@ package
 			addChild(map);
 		}
 		
-		private function onMapReady(event:MapEvent):void
+		private function onMapReady(e:MapEvent):void
 		{
 			//trace("onMapReady");
 			
@@ -352,9 +367,9 @@ package
 			//移除偵聽MAP載入完成
 			map.removeEventListener(MapEvent.MAP_READY, onMapReady);
 			//偵聽MAP VIEW CHANGE START
-			//map.addEventListener(MapMoveEvent.MOVE_START, onMapMoveStart);
+			map.addEventListener(MapMoveEvent.MOVE_START, onMapMoveStart);
 			//偵聽MAP VIEW CHANGE END
-			//map.addEventListener(MapMoveEvent.MOVE_END, onMapMoveEnd);
+			map.addEventListener(MapMoveEvent.MOVE_END, onMapMoveEnd);
 			//偵聽MAP ZOOM CHANGE
 			//map.addEventListener(MapZoomEvent.CONTINUOUS_ZOOM_END , onMapZoomEnd);
 			
@@ -364,6 +379,16 @@ package
 			map.addOverlay(createMarker(latlng));
 		}
 		
+		private function onMapMoveStart(e:MapMoveEvent):void
+		{
+			map.clearOverlays();
+		}
+		
+		private function onMapMoveEnd(e:MapMoveEvent):void
+		{
+			getPlace();
+		}
+		
 		private function createMarker(latlng:LatLng):Marker
 		{
 			var options:MarkerOptions = new MarkerOptions();
@@ -371,14 +396,40 @@ package
 			_mc.mouseEnabled = false;
 			_mc.mouseChildren = false;
 			options.icon = _mc;
-			//讓marker不能點
-			options.clickable = false;
-				
+			//options.clickable = false;// 讓marker不能點
+			
 			var marker:Marker = new Marker(latlng , options);
-			//marker.addEventListener(MapMouseEvent.ROLL_OVER, onMakerOver);
-			//marker.addEventListener(MapMouseEvent.ROLL_OUT , onMakerOut);
-			//marker.addEventListener(MapMouseEvent.CLICK    , onMakerClick);
+			marker.addEventListener(MapMouseEvent.ROLL_OVER, onMakerOver);
+			marker.addEventListener(MapMouseEvent.ROLL_OUT , onMakerOut);
+			marker.addEventListener(MapMouseEvent.CLICK    , onMakerClick);
 			return marker;
+		}
+		
+		private function onMakerOver(e:MapMouseEvent):void 
+		{
+			var marker:Marker = e.target as Marker;
+			var _mc:MyMarker = marker.getOptions().icon as MyMarker;
+			var tf:TextField = new TextField();
+			tf.name = "tip";
+			tf.autoSize = TextFieldAutoSize.LEFT;
+			tf.text = "Test";
+			tf.x = - tf.textWidth * 0.5;
+			tf.y = -50;
+			_mc.addChild(tf);
+		}
+		
+		private function onMakerOut(e:MapMouseEvent):void 
+		{
+			var marker:Marker = e.target as Marker;
+			var _mc:MyMarker = marker.getOptions().icon as MyMarker;
+			_mc.removeChild(_mc.getChildByName("tip"));
+		}
+		
+		private function onMakerClick(e:MapMouseEvent):void 
+		{
+			var marker:Marker = e.target as Marker;
+			var _mc:MyMarker = marker.getOptions().icon as MyMarker;
+			
 		}
 	}
 	
