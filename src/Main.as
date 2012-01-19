@@ -1,15 +1,10 @@
 package 
 {
-	/**
-	 * ...
-	 * @author gotoAndPlay()™ Digital Consulting.
-	 * @author Rhino Lu
-	 */
-	import com.bit101.components.ComboBox;
-	import com.bit101.components.PushButton;
 	import com.adobe.serialization.json.JSON;
+	import com.bit101.components.PushButton;
 	import com.bit101.components.Style;
 	import com.facebook.graph.controls.Distractor;
+	import com.facebook.graph.data.FacebookAuthResponse;
 	import com.facebook.graph.Facebook;
 	import com.google.maps.controls.ZoomControl;
 	import com.google.maps.interfaces.IControl;
@@ -62,6 +57,7 @@ package
 			stage.align = StageAlign.TOP_LEFT;
 			stage.quality = StageQuality.HIGH;
 			stage.scaleMode = StageScaleMode.NO_SCALE;
+			stage.stageFocusRect = false; // 防止按 tab 出現黃框
 			
 			info_txt = new TextField();
 			//info_txt.mouseEnabled = false;
@@ -95,12 +91,17 @@ package
 			info_txt.appendText("onInit\n");
 			if (result) {
 				info_txt.appendText(t.obj(result));
-				//getUserData();
-				initMap();
-			} else {
-				removeFBLoading();
-				connect_btn = new PushButton(this, stage.stageWidth * 0.5, stage.stageHeight * 0.5, "Connect", popup);
+				var far:FacebookAuthResponse = result as FacebookAuthResponse;
+				if (far == null || far.uid == null) {
+					// 未登入
+				}else {
+					// 已登入
+					initMap();
+					return;
+				}
 			}
+			removeFBLoading();
+			connect_btn = new PushButton(this, stage.stageWidth * 0.5, stage.stageHeight * 0.5, "Connect", popup);
 		}
 		
 		private function clearInfo(e:MouseEvent):void 
@@ -112,8 +113,7 @@ package
 		{
 			connect_btn.mouseEnabled = false;
 			
-			//var opts:Object = { perms:"email" };
-			var opts:Object = { perms:"user_checkins,publish_checkins" };
+			var opts:Object = { scope:"user_checkins,publish_checkins" };
 			Facebook.login(onLogin,opts);
 			addFBLoading();
 		}
@@ -122,12 +122,13 @@ package
 		{
 			info_txt.appendText("onLogin\n");
 			if (result) {
+				// 已登入
 				info_txt.appendText(t.obj(result));
 				removeChild(connect_btn);
 				connect_btn = null;
-				//getUserData();
 				initMap();
 			} else {
+				// 未登入
 				removeFBLoading();
 				connect_btn.mouseEnabled = true;
 			}
