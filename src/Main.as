@@ -30,14 +30,12 @@ package
 	
 	public class Main extends Sprite 
 	{
-		private const APP_ID:String = "212187482143493";
+		private const APP_ID:String = "212187482143493"; // your Facebook APP ID
+		private const MAP_KEY:String = "ABQIAAAAqMSM8xFmOPGb-4dBPY1IJhRjSOXmjpaW1w5P4B34l-76fx9uexTdhVHfpZZnA8IsDDIIlNuwvSEvYQ"; // Google Map Key
 		private var default_lat:Number = 25.014932;
 		private var default_lng:Number = 121.534498;
 		private var clear_btn:PushButton;
 		private var connect_btn:PushButton;
-		//private var checkin_btn:PushButton;
-		//private var getPlace_btn:PushButton;
-		//private var place_cb:ComboBox;
 		private var fb_loading:Distractor;
 		private var info_txt:TextField;
 		private var map:Map;
@@ -57,10 +55,9 @@ package
 			stage.align = StageAlign.TOP_LEFT;
 			stage.quality = StageQuality.HIGH;
 			stage.scaleMode = StageScaleMode.NO_SCALE;
-			stage.stageFocusRect = false; // 防止按 tab 出現黃框
+			stage.stageFocusRect = false;
 			
 			info_txt = new TextField();
-			//info_txt.mouseEnabled = false;
 			info_txt.multiline = true;
 			info_txt.width = stage.stageWidth;
 			info_txt.height = 100;
@@ -71,11 +68,7 @@ package
 			Style.embedFonts = false;
 			Style.fontName = "Arial";
 			
-			clear_btn    = new PushButton(this, stage.stageWidth - 110,  10, "Clear"    , clearInfo);
-			//getPlace_btn = new PushButton(this, stage.stageWidth - 110, 110, "Get Place", getPlace);
-			//checkin_btn  = new PushButton(this, stage.stageWidth - 110, 140, "Check in" , checkin);
-			//checkin_btn.mouseEnabled = false;
-			//place_cb     = new ComboBox(  this, stage.stageWidth - 110, 170);
+			clear_btn    = new PushButton(this, stage.stageWidth - 110, 10, "Clear", clearInfo);
 			
 			if (!((new LocalConnection().domain == "localhost") || Capabilities.playerType == "Desktop")) {
 				info_txt.appendText("Facebook.init\n");
@@ -93,9 +86,9 @@ package
 				info_txt.appendText(t.obj(result));
 				var far:FacebookAuthResponse = result as FacebookAuthResponse;
 				if (far == null || far.uid == null) {
-					// 未登入
+					// not login yet
 				}else {
-					// 已登入
+					// already login
 					initMap();
 					return;
 				}
@@ -122,13 +115,13 @@ package
 		{
 			info_txt.appendText("onLogin\n");
 			if (result) {
-				// 已登入
+				// login successed
 				info_txt.appendText(t.obj(result));
 				removeChild(connect_btn);
 				connect_btn = null;
 				initMap();
 			} else {
-				// 未登入
+				// login fail
 				removeFBLoading();
 				connect_btn.mouseEnabled = true;
 			}
@@ -139,7 +132,6 @@ package
 		{
 			info_txt.appendText("getUserData\n");
 			Facebook.fqlQuery("SELECT uid,name,pic_big FROM user WHERE uid = me() ", onDataComplete);
-			//Facebook.fqlQuery("SELECT coords,tagged_uids,author_uid,page_id,app_id,post_id,timestamp,message FROM checkin WHERE checkin_id = xxxxx ", onDataComplete);
 		}
 		
 		private function onDataComplete(result:Object, fail:Object):void
@@ -221,12 +213,9 @@ package
 			
 			info_txt.appendText("checkin\n");
 			var obj:Object = { };
-			//obj.message = "測試";
-			//obj.place = "217291341621335"; // 
-			//obj.coordinates = JSON.encode({ "latitude":default_lat, "longitude":default_lng }); // 經緯度
 			obj.place = checkin_obj.id; // 
-			obj.coordinates = JSON.encode({ "latitude":checkin_obj.lat, "longitude":checkin_obj.lng }); // 經緯度
-			//obj.tags = [uid1,uid2]; // 誰也在這裡
+			obj.coordinates = JSON.encode({ "latitude":checkin_obj.lat, "longitude":checkin_obj.lng }); // location
+			//obj.tags = [uid1,uid2]; // with who
 			//info_txt.appendText(t.obj(obj));
 			Facebook.api("me/checkins", onCheckinComplete, obj, "POST");
 			
@@ -261,7 +250,7 @@ package
 			obj.type = "place";
 			//obj.center = default_lat + "," + default_lng;
 			obj.center = map.getCenter().lat() + "," + map.getCenter().lng();
-			obj.distance = 2000; // 1000 公尺
+			obj.distance = 2000; // 2,000 meter
 			Facebook.api("search", onGetPlaceComplete, obj, "GET");
 			
 			addFBLoading();
@@ -307,9 +296,7 @@ package
 			}else {
 				fb_loading = new Distractor();
 				fb_loading.x = stage.stageWidth * 0.5 - 100;
-				//fb_loading.y = stage.stageHeight * 0.5 - 50;
 				fb_loading.y = 40;
-				//fb_loading.text = "connecting ...";
 				fb_loading.mouseChildren = fb_loading.mouseEnabled = false;
 				addChild(fb_loading);
 			}
@@ -318,8 +305,6 @@ package
 		private function removeFBLoading():void 
 		{
 			if (fb_loading) {
-				//removeChild(fb_loading);
-				//fb_loading = null;
 				fb_loading.visible = false;
 			}
 		}
@@ -329,7 +314,7 @@ package
 		{
 			Security.allowInsecureDomain("maps.googleapis.com");
 			map = new Map();
-			map.key = "ABQIAAAAqMSM8xFmOPGb-4dBPY1IJhRjSOXmjpaW1w5P4B34l-76fx9uexTdhVHfpZZnA8IsDDIIlNuwvSEvYQ"; // gotoandplay
+			map.key = MAP_KEY;
 			
 			//介面語系
 			map.language = "zh-TW";
